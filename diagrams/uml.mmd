@@ -1,15 +1,43 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
-    %% Keep this file updated so it matches your final implementation.
+    %% PawPal+ class diagram
+    %% Four core classes: Owner, Pet, CareTask, Schedule
 
-    class ClassName {
-        +type attribute
-        +method() returnType
+    class Owner {
+        +str name
+        +str email
+        +list~Pet~ pets
+        +addPet(pet Pet) void
+        +removePet(pet Pet) void
+        +viewTodayTasks() list~CareTask~
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Pet {
+        +str name
+        +str species
+        +int age
+        +str careNotes
+        +updateInfo(name str, species str, age int, careNotes str) void
+        +getCareNeeds() list~CareTask~
     }
 
-    ClassName --> AnotherClass : relationship
+    class CareTask {
+        +str taskName
+        +date date
+        +time time
+        +str status
+        +markComplete() void
+        +reschedule(newDate date, newTime time) void
+    }
+
+    class Schedule {
+        +list~CareTask~ tasks
+        +date date
+        +addTask(task CareTask) void
+        +removeTask(task CareTask) void
+        +getTodayTasks() list~CareTask~
+    }
+
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" CareTask : needs
+    Schedule "1" o-- "*" CareTask : contains
+    Owner "1" --> "1" Schedule : manages
