@@ -1,11 +1,21 @@
 classDiagram
     %% PawPal+ class diagram
     %% Four core classes: Owner, Pet, CareTask, Schedule
+    %% Design: a Pet owns its CareTasks (single source of truth);
+    %% a Schedule is a one-day view; an Owner has many Schedules.
+
+    class TaskStatus {
+        <<enumeration>>
+        PENDING
+        COMPLETE
+        SKIPPED
+    }
 
     class Owner {
         +str name
         +str email
         +list~Pet~ pets
+        +list~Schedule~ schedules
         +addPet(pet Pet) void
         +removePet(pet Pet) void
         +viewTodayTasks() list~CareTask~
@@ -16,6 +26,7 @@ classDiagram
         +str species
         +int age
         +str careNotes
+        +list~CareTask~ careTasks
         +updateInfo(name str, species str, age int, careNotes str) void
         +getCareNeeds() list~CareTask~
     }
@@ -24,20 +35,23 @@ classDiagram
         +str taskName
         +date date
         +time time
-        +str status
+        +TaskStatus status
+        +Pet pet
         +markComplete() void
         +reschedule(newDate date, newTime time) void
     }
 
     class Schedule {
-        +list~CareTask~ tasks
         +date date
+        +list~CareTask~ tasks
         +addTask(task CareTask) void
         +removeTask(task CareTask) void
         +getTodayTasks() list~CareTask~
     }
 
     Owner "1" --> "*" Pet : owns
-    Pet "1" --> "*" CareTask : needs
-    Schedule "1" o-- "*" CareTask : contains
-    Owner "1" --> "1" Schedule : manages
+    Owner "1" --> "*" Schedule : manages
+    Pet "1" *-- "*" CareTask : owns
+    CareTask "*" --> "1" Pet : belongs to
+    Schedule "1" o-- "*" CareTask : references
+    CareTask ..> TaskStatus : uses
