@@ -2,13 +2,21 @@ classDiagram
     %% PawPal+ class diagram
     %% Four core classes: Owner, Pet, CareTask, Schedule
     %% Design: a Pet owns its CareTasks (single source of truth);
-    %% a Schedule is a one-day view; an Owner has many Schedules.
+    %% a Schedule is the "brain" that gathers + orders an owner's
+    %% tasks for one day; an Owner has many Schedules.
 
     class TaskStatus {
         <<enumeration>>
         PENDING
         COMPLETE
         SKIPPED
+    }
+
+    class Frequency {
+        <<enumeration>>
+        ONCE
+        DAILY
+        WEEKLY
     }
 
     class Owner {
@@ -18,6 +26,7 @@ classDiagram
         +list~Schedule~ schedules
         +addPet(pet Pet) void
         +removePet(pet Pet) void
+        +getAllTasks() list~CareTask~
         +viewTodayTasks() list~CareTask~
     }
 
@@ -28,6 +37,7 @@ classDiagram
         +str careNotes
         +list~CareTask~ careTasks
         +updateInfo(name str, species str, age int, careNotes str) void
+        +addTask(task CareTask) void
         +getCareNeeds() list~CareTask~
     }
 
@@ -35,15 +45,18 @@ classDiagram
         +str taskName
         +date date
         +time time
+        +Frequency frequency
         +TaskStatus status
         +Pet pet
         +markComplete() void
         +reschedule(newDate date, newTime time) void
+        +occurs_on(day date) bool
     }
 
     class Schedule {
         +date date
         +list~CareTask~ tasks
+        +for_owner(owner Owner, day date) Schedule$
         +addTask(task CareTask) void
         +removeTask(task CareTask) void
         +getTodayTasks() list~CareTask~
@@ -55,3 +68,4 @@ classDiagram
     CareTask "*" --> "1" Pet : belongs to
     Schedule "1" o-- "*" CareTask : references
     CareTask ..> TaskStatus : uses
+    CareTask ..> Frequency : uses
