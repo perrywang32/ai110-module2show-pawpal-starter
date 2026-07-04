@@ -6,12 +6,14 @@
 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+My initial UML design included classes such as Pet, Task, Schedule, and User. The Pet class stored information about each pet. The Task class represented care activities like walks or feeding. The Schedule class managed tasks by date and time. The User class represented the person using PawPal+ and connected them to their pets and tasks.
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
-
+Yes. During implementation, I updated the design to better represent how the classes interact and to avoid data consistency issues.
+One major change was making each Pet own its list of CareTask objects while also giving each CareTask a reference back to its Pet. This made it easier to determine which pet a task belongs to. I also changed Owner to store a list of Schedule objects instead of a single schedule so the application can manage tasks across multiple days. Finally, I added validation in Schedule.addTask() to ensure a task can only be added to the schedule for its matching date, preventing inconsistent data.
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
