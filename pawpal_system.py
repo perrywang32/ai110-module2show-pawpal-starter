@@ -17,7 +17,7 @@ Design decisions after review:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, time
+from datetime import date, time, timedelta
 from enum import Enum
 
 
@@ -51,9 +51,41 @@ class CareTask:
     # or make two tasks "unequal" just because their pets differ.
     pet: Pet | None = field(default=None, repr=False, compare=False)
 
-    def markComplete(self) -> None:
-        """Mark this task as complete."""
+    def next_occurrence(self) -> CareTask | None:
+        """Build the next occurrence of a recurring task.
+
+        Uses ``timedelta`` to advance this task's date by its frequency
+        (DAILY -> +1 day, WEEKLY -> +7 days) and returns a fresh, pending
+        CareTask at the same time. A one-off (ONCE) task does not recur, so
+        this returns ``None``.
+
+        Returns:
+            A new CareTask for the next date, or ``None`` if non-recurring.
+        """
+        if self.frequency == Frequency.DAILY:
+            next_date = self.date + timedelta(days=1)
+        elif self.frequency == Frequency.WEEKLY:
+            next_date = self.date + timedelta(weeks=1)
+        else:  # Frequency.ONCE
+            return None
+        return CareTask(self.taskName, next_date, self.time, self.frequency)
+
+    def markComplete(self) -> CareTask | None:
+        """Mark this task complete and, if recurring, schedule the next one.
+
+        Sets the status to COMPLETE, then asks ``next_occurrence()`` for the
+        follow-up task. If one exists and this task belongs to a pet, the
+        new task is attached to that pet (which wires its back-reference),
+        so tomorrow's/next week's occurrence appears automatically.
+
+        Returns:
+            The newly created follow-up CareTask, or ``None`` for a one-off.
+        """
         self.status = TaskStatus.COMPLETE
+        upcoming = self.next_occurrence()
+        if upcoming is not None and self.pet is not None:
+            self.pet.addTask(upcoming)  # wires the new task's pet back-reference
+        return upcoming
 
     def reschedule(self, newDate: date, newTime: time) -> None:
         """Move this task to a new date and time (and reopen it)."""
@@ -168,6 +200,67 @@ class Schedule:
         if task in self.tasks:
             self.tasks.remove(task)
 
+    def sort_by_time(self) -> list[CareTask]:
+        """Return the day's tasks ordered by time of day.
+
+        Sorts on the tuple ``(time, pet name, task name)`` so ties at the
+        same time break deterministically (by pet, then task name) rather
+        than depending on insertion order. Returns a new list; the stored
+        ``tasks`` order is left untouched.
+        """
+        return sorted(
+            self.tasks,
+            key=lambda t: (t.time, t.pet.name if t.pet else "", t.taskName),
+        )
+
     def getTodayTasks(self) -> list[CareTask]:
-        """Return this day's tasks, ordered by time of day."""
-        return sorted(self.tasks, key=lambda t: t.time)
+        """Return this day's tasks, ordered by time (delegates to sort_by_time)."""
+        return self.sort_by_time()
+
+    def filter_by_pet(self, pet_name: str) -> list[CareTask]:
+        """Return only the tasks belonging to one pet, ordered by time.
+
+        Args:
+            pet_name: Name of the pet to keep tasks for.
+
+        Returns:
+            The time-sorted subset of tasks whose pet has that name.
+        """
+        return [t for t in self.sort_by_time() if t.pet and t.pet.name == pet_name]
+
+    def filter_by_status(self, status: TaskStatus) -> list[CareTask]:
+        """Return only the tasks with a given status, ordered by time.
+
+        Args:
+            status: The TaskStatus to keep (also accepts its string value,
+                e.g. "pending", since TaskStatus is a str-based enum).
+
+        Returns:
+            The time-sorted subset of tasks matching that status.
+        """
+        return [t for t in self.sort_by_time() if t.status == status]
+
+    def find_conflicts(self) -> list[str]:
+        """Detect tasks scheduled at the same time and return warning messages.
+
+        Lightweight, single-pass strategy: bucket every task by its ``time``
+        value, then flag any slot holding two or more tasks (covering both
+        same-pet and cross-pet clashes). Returns human-readable warnings
+        instead of raising, so a clash never crashes the program.
+
+        Returns:
+            One message per conflicting time slot naming the clashing tasks
+            and their pets; an empty list when there are no conflicts.
+        """
+        by_time: dict[time, list[CareTask]] = {}
+        for task in self.sort_by_time():
+            by_time.setdefault(task.time, []).append(task)
+
+        warnings: list[str] = []
+        for slot, tasks in sorted(by_time.items()):
+            if len(tasks) > 1:
+                labels = ", ".join(
+                    f"{t.taskName} ({t.pet.name if t.pet else '?'})" for t in tasks
+                )
+                warnings.append(f"Conflict at {slot:%H:%M}: {labels}")
+        return warnings

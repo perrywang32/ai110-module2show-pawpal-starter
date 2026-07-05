@@ -23,11 +23,14 @@ One major change was making each Pet own its list of CareTask objects while also
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
+- My scheduler considers the task date, time, recurrence (once, daily, weekly), and completion status. It also groups tasks from all of the owner's pets into one daily schedule.
+
+- I decided that date and time were the highest priorities because a schedule must show tasks in the correct order. After that, I included recurrence so repeating tasks could automatically generate their next occurrence. Status and conflict detection help organize the schedule but were lower priorities because they do not affect the order of tasks.
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
-
+One tradeoff in my scheduler is that `find_conflicts()` only checks for exact time matches. This keeps the algorithm simple and easy to understand, and it returns warning messages instead of crashing the program. Claude suggested a more Pythonic `groupby` version, but that version depends on the tasks already being sorted correctly. I decided the dictionary-based version was better for this project because it is easier to read and less likely to break if the sorting logic changes later. A more advanced version could detect tasks that are close together, such as 9:00 and 9:05, but that would add extra complexity.
 ---
 
 ## 3. AI Collaboration

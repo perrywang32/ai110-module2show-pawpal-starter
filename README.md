@@ -72,14 +72,46 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
+The scheduling logic lives in `pawpal_system.py`. The `Schedule` class acts as
+the "brain": `Schedule.for_owner(owner, day)` gathers every task across an
+owner's pets that occurs on a given day, and the methods below organize,
+filter, and validate that day's tasks.
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Schedule.sort_by_time()` | Sorts by the tuple `(time, pet name, task name)` so same-time ties break deterministically. `Schedule.getTodayTasks()` delegates to it. |
+| Filtering | `Schedule.filter_by_pet(pet_name)`, `Schedule.filter_by_status(status)` | Return the time-sorted subset for one pet, or for a status (e.g. only `pending`). |
+| Conflict detection | `Schedule.find_conflicts()` | Buckets tasks by `time` and warns about any slot with 2+ tasks (same-pet or cross-pet). Returns warning strings instead of raising, so a clash never crashes the app. |
+| Recurring tasks | `CareTask.markComplete()`, `CareTask.next_occurrence()` | Completing a `daily`/`weekly` task auto-creates the next occurrence using `timedelta` (+1 day / +7 days). A `once` task creates nothing. |
+
+### Details
+
+- **Sorting behavior — `Schedule.sort_by_time()`**
+  Returns a new list of the day's tasks ordered by time of day. The sort key
+  is `(time, pet name, task name)`, so if two tasks share a time they fall
+  back to pet name then task name rather than depending on insertion order.
+  `getTodayTasks()` is a thin wrapper around this method.
+
+- **Filtering behavior — `Schedule.filter_by_pet()` / `Schedule.filter_by_status()`**
+  `filter_by_pet(pet_name)` keeps only tasks belonging to the named pet.
+  `filter_by_status(status)` keeps only tasks with the given `TaskStatus`
+  (e.g. `TaskStatus.PENDING`); because `TaskStatus` is a string-based enum, the
+  plain string `"pending"` works too. Both return results already sorted by time.
+
+- **Conflict detection — `Schedule.find_conflicts()`**
+  A lightweight, single-pass check: it buckets every task by its `time` value
+  and flags any slot that holds two or more tasks. This catches both a single
+  pet double-booked and two different pets needing attention at once. It
+  returns a list of human-readable warnings (empty when there are none)
+  instead of throwing, so the caller decides how to surface them.
+
+- **Recurring task logic — `CareTask.markComplete()` / `CareTask.next_occurrence()`**
+  When a `daily` or `weekly` task is marked complete, `markComplete()` sets its
+  status to `complete` and then calls `next_occurrence()`, which uses
+  `datetime.timedelta` to advance the date (`+1 day` for daily, `+7 days` for
+  weekly) and build a fresh pending `CareTask`. The new task is attached to the
+  same pet automatically, so the next occurrence shows up without manual entry.
+  One-off (`once`) tasks return `None` and create no follow-up.
 
 ## 📸 Demo Walkthrough
 
