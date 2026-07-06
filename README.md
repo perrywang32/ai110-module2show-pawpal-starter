@@ -56,19 +56,31 @@ Paste a sample of your app's CLI or Streamlit output here so a reader can see wh
 
 ## 🧪 Testing PawPal+
 
+Run the full automated test suite from the project root:
+
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
+The tests in `tests/test_pawpal.py` cover the scheduler's most important behaviors:
+
+- **Sorting** — tasks added out of order come back in chronological order, ties break deterministically by pet then task name, and sorting never mutates the stored order.
+- **Filtering** — `filter_by_pet()` and `filter_by_status()` return the correct time-sorted subset (and an empty list for no matches).
+- **Recurring tasks** — completing a `daily`/`weekly` task auto-creates the next occurrence (+1 day / +7 days), while a `once` task creates nothing.
+- **Conflict detection** — `find_conflicts()` flags two tasks scheduled at the same time with a warning message instead of crashing.
+
+### Sample Test Output
 
 ```
-# Paste your pytest output here
+............                                                             [100%]
+12 passed in 0.05s
 ```
+
+### Confidence Level
+
+⭐⭐⭐⭐⭐ (5/5)
+
+All 12 tests pass, covering every core scheduling behavior — sorting, filtering, recurrence, and conflict detection — including edge cases such as tie-breaking, non-mutation of stored order, one-off tasks, and unknown pet names. The green suite gives high confidence that the scheduling logic in `pawpal_system.py` behaves as designed.
 
 ## 📐 Smarter Scheduling
 
