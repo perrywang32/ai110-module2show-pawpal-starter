@@ -3,7 +3,7 @@ from datetime import date, time
 
 # Bring in the core PawPal+ classes. CareTask is imported as Task so the
 # UI code can refer to it by the shorter name.
-from pawpal_system import Owner, Pet, CareTask as Task, Schedule, Frequency
+from pawpal_system import Owner, Pet, CareTask as Task, Schedule, Frequency, TaskStatus
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -111,27 +111,74 @@ else:
 
 st.divider()
 
-# --- Build today's schedule ---
+# --- Build a schedule for a chosen day ---
 st.subheader("Build Schedule")
-st.caption("Gathers every task across your pets that occurs today, ordered by time.")
+st.caption(
+    "Pick a day and generate the plan. Tasks are gathered across all your pets, "
+    "sorted by time, and checked for time conflicts."
+)
 
+# Let the user choose ANY date, not just today. The `key` makes Streamlit
+# remember the chosen date across reruns (clicks/filter changes).
+schedule_day = st.date_input("Schedule date", value=date.today(), key="schedule_day")
+
+# Pressing the button flips a flag we keep in session_state, so the schedule
+# stays on screen through later reruns (e.g. when filtering or marking done).
 if st.button("Generate schedule"):
-    schedule = Schedule.for_owner(owner, date.today())
-    todays_tasks = schedule.getTodayTasks()
+    st.session_state.show_schedule = True
 
-    st.markdown(f"**Today's plan for {owner.name} — {date.today():%A, %B %d, %Y}**")
-    if not todays_tasks:
-        st.info("Nothing scheduled today. 🎉")
-    else:
-        st.table(
-            [
-                {
-                    "Time": t.time.strftime("%H:%M"),
-                    "Task": t.taskName,
-                    "Pet": t.pet.name if t.pet else "—",
-                    "Frequency": t.frequency.value,
-                    "Status": t.status.value,
-                }
-                for t in todays_tasks
-            ]
+if st.session_state.get("show_schedule"):
+    # Rebuild the schedule fresh each rerun from the chosen day. Because
+    # Schedule.for_owner reuses the pets' real CareTask objects, marking one
+    # complete below actually updates the stored task (and spawns recurrences).
+    schedule = Schedule.for_owner(owner, schedule_day)
+
+    st.markdown(f"**Plan for {owner.name} — {schedule_day:%A, %B %d, %Y}**")
+
+    # Conflict warnings are computed on the FULL day (not the filtered view),
+    # so a clash is never hidden just because a filter is active.
+    for message in schedule.find_conflicts():
+        st.warning(f"⚠️ {message}")
+
+    # --- Filtering controls ---
+    fcol1, fcol2 = st.columns(2)
+    with fcol1:
+        pet_filter = st.selectbox(
+            "Filter by pet", ["All pets"] + [p.name for p in owner.pets]
         )
+    with fcol2:
+        status_filter = st.selectbox(
+            "Filter by status", ["All"] + [s.value for s in TaskStatus]
+        )
+
+    # Start from the time-sorted list, then narrow with the Schedule methods.
+    tasks = schedule.getTodayTasks()
+    if pet_filter != "All pets":
+        tasks = schedule.filter_by_pet(pet_filter)
+    if status_filter != "All":
+        wanted = schedule.filter_by_status(TaskStatus(status_filter))
+        tasks = [t for t in tasks if t in wanted]
+
+    if not tasks:
+        st.info("Nothing to show for this day and filter. 🎉")
+    else:
+        # A header row, then one row per task with a "Mark done" button.
+        head = st.columns([1, 3, 2, 2, 2, 2])
+        for col, label in zip(head, ["Time", "Task", "Pet", "Frequency", "Status", ""]):
+            col.markdown(f"**{label}**")
+
+        for i, t in enumerate(tasks):
+            c1, c2, c3, c4, c5, c6 = st.columns([1, 3, 2, 2, 2, 2])
+            c1.write(t.time.strftime("%H:%M"))
+            c2.write(t.taskName)
+            c3.write(t.pet.name if t.pet else "—")
+            c4.write(t.frequency.value)
+            c5.write(t.status.value)
+            with c6:
+                if t.status == TaskStatus.PENDING:
+                    # Unique key per row so Streamlit tracks each button.
+                    if st.button("✓ Done", key=f"done_{i}_{t.taskName}_{t.time}"):
+                        t.markComplete()  # recurring tasks spawn their next date
+                        st.rerun()
+                else:
+                    c6.write("—")

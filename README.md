@@ -44,14 +44,39 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+Run the command-line demo to see the scheduling logic end-to-end:
+
+```bash
+python main.py
+```
 
 ```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+🐾 PawPal+ — Jordan's day — Sunday, July 05, 2026
+
+All tasks (sorted by time):
+------------------------------------------------
+  07:30  Morning walk    (Biscuit)  [pending]
+  09:00  Breakfast       (Biscuit)  [pending]
+  09:00  Feed cat        (Mochi)  [pending]
+  12:30  Feed dog        (Biscuit)  [pending]
+  19:00  Evening play    (Mochi)  [complete]
+
+Tasks for Biscuit:
+------------------------------------------------
+  07:30  Morning walk    (Biscuit)  [pending]
+  09:00  Breakfast       (Biscuit)  [pending]
+  12:30  Feed dog        (Biscuit)  [pending]
+
+Pending tasks only:
+------------------------------------------------
+  07:30  Morning walk    (Biscuit)  [pending]
+  09:00  Breakfast       (Biscuit)  [pending]
+  09:00  Feed cat        (Mochi)  [pending]
+  12:30  Feed dog        (Biscuit)  [pending]
+
+Conflict check:
+------------------------------------------------
+  ⚠️  Conflict at 09:00: Breakfast (Biscuit), Feed cat (Mochi)
 ```
 
 ## 🧪 Testing PawPal+
@@ -82,57 +107,54 @@ The tests in `tests/test_pawpal.py` cover the scheduler's most important behavio
 
 All 12 tests pass, covering every core scheduling behavior — sorting, filtering, recurrence, and conflict detection — including edge cases such as tie-breaking, non-mutation of stored order, one-off tasks, and unknown pet names. The green suite gives high confidence that the scheduling logic in `pawpal_system.py` behaves as designed.
 
-## 📐 Smarter Scheduling
+## ✨ Features
 
-The scheduling logic lives in `pawpal_system.py`. The `Schedule` class acts as
-the "brain": `Schedule.for_owner(owner, day)` gathers every task across an
-owner's pets that occurs on a given day, and the methods below organize,
-filter, and validate that day's tasks.
+The scheduling logic lives in `pawpal_system.py`, where the `Schedule` class
+acts as the "brain": `Schedule.for_owner(owner, day)` gathers every task across
+an owner's pets that occurs on a given day. Four core features organize and
+validate that day's plan:
 
-| Feature | Method(s) | Notes |
-|---------|-----------|-------|
-| Task sorting | `Schedule.sort_by_time()` | Sorts by the tuple `(time, pet name, task name)` so same-time ties break deterministically. `Schedule.getTodayTasks()` delegates to it. |
-| Filtering | `Schedule.filter_by_pet(pet_name)`, `Schedule.filter_by_status(status)` | Return the time-sorted subset for one pet, or for a status (e.g. only `pending`). |
-| Conflict detection | `Schedule.find_conflicts()` | Buckets tasks by `time` and warns about any slot with 2+ tasks (same-pet or cross-pet). Returns warning strings instead of raising, so a clash never crashes the app. |
-| Recurring tasks | `CareTask.markComplete()`, `CareTask.next_occurrence()` | Completing a `daily`/`weekly` task auto-creates the next occurrence using `timedelta` (+1 day / +7 days). A `once` task creates nothing. |
-
-### Details
-
-- **Sorting behavior — `Schedule.sort_by_time()`**
-  Returns a new list of the day's tasks ordered by time of day. The sort key
-  is `(time, pet name, task name)`, so if two tasks share a time they fall
-  back to pet name then task name rather than depending on insertion order.
-  `getTodayTasks()` is a thin wrapper around this method.
-
-- **Filtering behavior — `Schedule.filter_by_pet()` / `Schedule.filter_by_status()`**
-  `filter_by_pet(pet_name)` keeps only tasks belonging to the named pet.
-  `filter_by_status(status)` keeps only tasks with the given `TaskStatus`
-  (e.g. `TaskStatus.PENDING`); because `TaskStatus` is a string-based enum, the
-  plain string `"pending"` works too. Both return results already sorted by time.
-
-- **Conflict detection — `Schedule.find_conflicts()`**
-  A lightweight, single-pass check: it buckets every task by its `time` value
-  and flags any slot that holds two or more tasks. This catches both a single
-  pet double-booked and two different pets needing attention at once. It
-  returns a list of human-readable warnings (empty when there are none)
-  instead of throwing, so the caller decides how to surface them.
-
-- **Recurring task logic — `CareTask.markComplete()` / `CareTask.next_occurrence()`**
-  When a `daily` or `weekly` task is marked complete, `markComplete()` sets its
-  status to `complete` and then calls `next_occurrence()`, which uses
-  `datetime.timedelta` to advance the date (`+1 day` for daily, `+7 days` for
-  weekly) and build a fresh pending `CareTask`. The new task is attached to the
-  same pet automatically, so the next occurrence shows up without manual entry.
-  One-off (`once`) tasks return `None` and create no follow-up.
+- **Sorting by time** — `sort_by_time()` returns the day's tasks ordered by time
+  of day. Its sort key is `(time, pet name, task name)`, so tasks at the same
+  time break ties deterministically by pet then task name rather than by
+  insertion order. `getTodayTasks()` is a thin wrapper around it.
+- **Filtering** — `filter_by_pet(pet_name)` keeps only one pet's tasks, and
+  `filter_by_status(status)` keeps only tasks with a given `TaskStatus`
+  (e.g. only `pending`). Both return results already sorted by time.
+- **Recurring tasks** — completing a `daily` or `weekly` task via
+  `markComplete()` calls `next_occurrence()`, which uses `timedelta` to advance
+  the date (`+1 day` for daily, `+7 days` for weekly) and attaches a fresh
+  pending task to the same pet automatically. A `once` task creates no follow-up.
+- **Conflict detection** — `find_conflicts()` buckets tasks by `time` and flags
+  any slot holding two or more tasks (same-pet or cross-pet). It returns
+  human-readable warning strings instead of raising, so a clash never crashes
+  the app.
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+Launch the Streamlit app from the project root:
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+```bash
+streamlit run app.py
+```
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+The single-page UI walks top to bottom:
+
+1. **Set the owner.** Enter the owner's name and email at the top. These persist
+   across interactions for the whole session.
+2. **Add a pet.** Under *Add a Pet*, enter a name, pick a species, set an age,
+   and click **Add pet**. Each pet you add appears in the *Current pets* table
+   with its task count. Repeat to add as many pets as you like.
+3. **Schedule a task.** Under *Add a Task*, choose the pet, give the task a
+   title, pick a date, a time, and a frequency (`once`, `daily`, or `weekly`),
+   then click **Add task**. The task is attached to that pet.
+4. **Generate the schedule.** Under *Build Schedule*, choose the date to view
+   and click **Generate schedule**. PawPal+ gathers every task that occurs on
+   that day across all pets and displays them **sorted by time**. Use the
+   *Filter by pet* and *Filter by status* dropdowns to narrow the view.
+5. **Watch sorting and conflict detection.** Tasks always render earliest-first,
+   with same-time ties ordered by pet then task name. If two tasks fall on the
+   same time slot, a **⚠️ conflict warning** appears above the table naming the
+   clashing tasks — it warns without blocking the plan. Marking a `daily` or
+   `weekly` task **✓ Done** completes it and automatically schedules its next
+   occurrence.
